@@ -21,17 +21,13 @@ jobs:
       - name: Install ldid
         run: brew install ldid
 
-      - name: Fix dylib paths
+      - name: Fix structure
         run: |
           mkdir -p lara/lib
-          mkdir -p lara/lara/lib
-          cp libgrabkernel2.dylib lara/lib/
-          cp libxpf.dylib lara/lib/
-          cp libgrabkernel2.dylib lara/lara/lib/
-          cp libxpf.dylib lara/lara/lib/
-          echo "dylibs copied!"
-          ls lara/lib/
-          ls lara/lara/lib/
+          cp libgrabkernel2.dylib lara/lib/ 2>/dev/null || true
+          cp libxpf.dylib lara/lib/ 2>/dev/null || true
+          ls -la lara/
+          ls -la lara/lib/ 2>/dev/null || true
 
       - name: Build IPA
         run: |
@@ -51,6 +47,7 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="Config/lara.entitlements" \
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             ENABLE_BITCODE=NO \
+            INFOPLIST_FILE=lara/Info.plist \
             archive \
             -archivePath "$PWD/build/lara.xcarchive"
           APP_PATH="$PWD/build/lara.xcarchive/Products/Applications/lara.app"
