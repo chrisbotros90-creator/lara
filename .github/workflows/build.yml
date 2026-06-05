@@ -1,14 +1,11 @@
 name: Build lara IPA
-
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: macos-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,34 +32,58 @@ jobs:
           echo "lara/lara contents:"
           ls lara/lara/
 
+      - name: Patch pbxproj
+        run: |
+          sed -i '' 's/GENERATE_INFOPLIST_FILE = YES/GENERATE_INFOPLIST_FILE = NO/g' lara.xcodeproj/project.pbxproj
+          echo "Patched pbxproj"
+
+      - name: List schemes (diagnostics)
+        run: xcodebuild -list -project lara.xcodeproj
+
       - name: Build IPA
         run: |
-          SDK=$(xcodebuild -showsdks | grep "iphoneos" | grep -v simulator | tail -1 | grep -oE 'iphoneos[0-9.]+')
-          echo "Using SDK: $SDK"
-          rm -rf build/
+          set -o pipefail
+          rm -rf build
           mkdir -p build
+
           xcodebuild \
             -project lara.xcodeproj \
             -scheme lara \
             -configuration Release \
-            -sdk "$SDK" \
+            -destination 'generic/platform=iOS' \
             ARCHS=arm64e \
+            ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="Config/lara.entitlements" \
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             ENABLE_BITCODE=NO \
-            GENERATE_INFOPLIST_FILE=NO \
             archive \
-            -archivePath "$PWD/build/lara.xcarchive" 2>&1 | grep -E "error:|warning:|ARCHIVE|Build"
+            -archivePath "$PWD/build/lara.xcarchive" \
+            2>&1 | tee build/xcodebuild.log
+
           APP_PATH="$PWD/build/lara.xcarchive/Products/Applications/lara.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "::error::Archive did not produce lara.app — see log below."
+            tail -n 80 build/xcodebuild.log
+            exit 1
+          fi
+
           mkdir -p "$PWD/build/Payload"
           cp -R "$APP_PATH" "$PWD/build/Payload/"
           plutil -replace UIFileSharingEnabled -bool YES "$PWD/build/Payload/lara.app/Info.plist"
           ldid -SConfig/lara.entitlements "$PWD/build/Payload/lara.app/lara"
-          cd "$PWD/build" && zip -qry lara.ipa Payload
-          echo "Done!"
+          ( cd "$PWD/build" && zip -qry lara.ipa Payload )
+          echo "Done! IPA at build/lara.ipa"
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: build/xcodebuild.log
+          retention-days: 7
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
