@@ -53,6 +53,7 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="Config/lara.entitlements" \
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             ENABLE_BITCODE=NO \
+            GENERATE_INFOPLIST_FILE=NO \
             archive \
             -archivePath "$PWD/build/lara.xcarchive" 2>&1 | grep -E "error:|warning:|ARCHIVE|Build"
           APP_PATH="$PWD/build/lara.xcarchive/Products/Applications/lara.app"
