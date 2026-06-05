@@ -24,8 +24,9 @@ jobs:
       - name: Fix dylib paths
         run: |
           mkdir -p lara/lib
-          [ -f libxpf.dylib ] && mv libxpf.dylib lara/lib/
-          [ -f libgrabkernel2.dylib ] && mv libgrabkernel2.dylib lara/lib/
+          cp libgrabkernel2.dylib lara/lib/
+          cp libxpf.dylib lara/lib/
+          echo "dylibs copied!"
           ls lara/lib/
 
       - name: Build IPA
