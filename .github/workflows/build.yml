@@ -23,11 +23,17 @@ jobs:
 
       - name: Fix structure
         run: |
-          mkdir -p lara/lib
-          cp libgrabkernel2.dylib lara/lib/ 2>/dev/null || true
-          cp libxpf.dylib lara/lib/ 2>/dev/null || true
-          ls -la lara/
-          ls -la lara/lib/ 2>/dev/null || true
+          mkdir -p lara/lara/lib
+          for d in assets classes funcs headers kexploit views PartyUI other; do
+            [ -d "$d" ] && cp -R "$d" lara/lara/ && echo "copied $d"
+          done
+          for f in Info.plist lara.swift lara-Bridging-Header.h; do
+            [ -f "$f" ] && cp "$f" lara/lara/ && echo "copied $f"
+          done
+          cp libgrabkernel2.dylib lara/lara/lib/ 2>/dev/null || true
+          cp libxpf.dylib lara/lara/lib/ 2>/dev/null || true
+          echo "lara/lara contents:"
+          ls lara/lara/
 
       - name: Build IPA
         run: |
@@ -47,7 +53,6 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="Config/lara.entitlements" \
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             ENABLE_BITCODE=NO \
-            INFOPLIST_FILE=lara/Info.plist \
             archive \
             -archivePath "$PWD/build/lara.xcarchive"
           APP_PATH="$PWD/build/lara.xcarchive/Products/Applications/lara.app"
