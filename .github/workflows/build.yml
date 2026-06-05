@@ -18,6 +18,24 @@ jobs:
       - name: Install ldid
         run: brew install ldid
 
+      - name: Fix structure
+        run: |
+          # The project references ALL sources under a SINGLE "lara/" folder.
+          # Your build log requested lara/lara-Bridging-Header.h, -I lara,
+          # -I lara/kexploit and INFOPLIST_FILE = lara/Info.plist -- one level deep.
+          # Assemble root-level sources into lara/ so the compiler can find them.
+          # Guards make this a no-op for anything already committed under lara/.
+          mkdir -p lara/lib
+          for d in assets classes funcs headers kexploit views PartyUI other; do
+            [ -d "$d" ] && cp -R "$d" lara/ && echo "copied $d"
+          done
+          for f in Info.plist lara.swift lara-Bridging-Header.h; do
+            [ -f "$f" ] && cp "$f" lara/ && echo "copied $f"
+          done
+          cp libgrabkernel2.dylib lara/lib/ 2>/dev/null || true
+          cp libxpf.dylib lara/lib/ 2>/dev/null || true
+          echo "lara/ contents:"; ls -la lara/
+
       - name: Build
         run: |
           set -o pipefail
