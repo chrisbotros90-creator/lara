@@ -54,7 +54,7 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             ENABLE_BITCODE=NO \
             archive \
-            -archivePath "$PWD/build/lara.xcarchive"
+            -archivePath "$PWD/build/lara.xcarchive" 2>&1 | grep -E "error:|warning:|ARCHIVE|Build"
           APP_PATH="$PWD/build/lara.xcarchive/Products/Applications/lara.app"
           mkdir -p "$PWD/build/Payload"
           cp -R "$APP_PATH" "$PWD/build/Payload/"
