@@ -21,6 +21,13 @@ jobs:
       - name: Install ldid
         run: brew install ldid
 
+      - name: Fix dylib paths
+        run: |
+          mkdir -p lara/lib
+          [ -f libxpf.dylib ] && mv libxpf.dylib lara/lib/
+          [ -f libgrabkernel2.dylib ] && mv libgrabkernel2.dylib lara/lib/
+          ls lara/lib/
+
       - name: Build IPA
         run: |
           SDK=$(xcodebuild -showsdks | grep "iphoneos" | grep -v simulator | tail -1 | grep -oE 'iphoneos[0-9.]+')
