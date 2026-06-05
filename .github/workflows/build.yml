@@ -24,13 +24,21 @@ jobs:
           for d in assets classes funcs headers kexploit views PartyUI other; do
             [ -d "$d" ] && cp -R "$d" lara/lara/ && echo "copied $d"
           done
-          for f in Info.plist lara.swift lara-Bridging-Header.h; do
+          # Source files belong INSIDE the synchronized group (lara/lara).
+          for f in lara.swift lara-Bridging-Header.h; do
             [ -f "$f" ] && cp "$f" lara/lara/ && echo "copied $f"
           done
+          # Info.plist is the app's INFOPLIST_FILE (lara/Info.plist) and must live
+          # OUTSIDE the synchronized source folder. If it sits inside lara/lara/,
+          # Xcode bundles it as a resource AND processes it as the Info.plist,
+          # causing "Multiple commands produce .../Info.plist".
+          [ -f Info.plist ] && cp Info.plist lara/Info.plist && echo "copied Info.plist -> lara/Info.plist"
+          # Safety net: ensure no stray Info.plist remains inside the synced folder.
+          rm -f lara/lara/Info.plist
           cp libgrabkernel2.dylib lara/lara/lib/ 2>/dev/null || true
           cp libxpf.dylib lara/lara/lib/ 2>/dev/null || true
-          echo "lara/lara contents:"
-          ls lara/lara/
+          echo "lara/ contents:";      ls lara/
+          echo "lara/lara contents:";  ls lara/lara/
 
       - name: Patch pbxproj
         run: |
