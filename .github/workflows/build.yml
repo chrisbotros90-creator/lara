@@ -1,3 +1,4 @@
+
 name: Build lara IPA
 
 on:
@@ -23,10 +24,9 @@ jobs:
 
       - name: Fix structure
         run: |
-          unzip -q lara-main_7.zip -d extracted 2>/dev/null || true
-          INNER=$(find extracted -name "lara.xcodeproj" -maxdepth 3 | head -1 | xargs dirname)
-          echo "Found project at: $INNER"
-          cp -Rn "$INNER/lara/" lara/lara/ 2>/dev/null || true
+          unzip -q lara-main_7.zip -d extracted
+          mkdir -p lara/lara
+          cp -R extracted/lara-main/lara/ lara/lara/
           cp libgrabkernel2.dylib lara/lara/lib/ 2>/dev/null || true
           cp libxpf.dylib lara/lara/lib/ 2>/dev/null || true
           echo "lara/lara contents:"
