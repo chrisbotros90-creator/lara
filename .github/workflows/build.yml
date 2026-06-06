@@ -1,11 +1,14 @@
 name: Build lara IPA
+
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: macos-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,71 +23,53 @@ jobs:
 
       - name: Fix structure
         run: |
-          # The project references ALL sources under a SINGLE "lara/" folder.
-          # Your build log requested lara/lara-Bridging-Header.h, -I lara,
-          # -I lara/kexploit and INFOPLIST_FILE = lara/Info.plist -- one level deep.
-          # Assemble root-level sources into lara/ so the compiler can find them.
-          # Guards make this a no-op for anything already committed under lara/.
-          mkdir -p lara/lib
-          for d in assets classes funcs headers kexploit views PartyUI other; do
-            [ -d "$d" ] && cp -R "$d" lara/ && echo "copied $d"
-          done
-          for f in Info.plist lara.swift lara-Bridging-Header.h; do
-            [ -f "$f" ] && cp "$f" lara/ && echo "copied $f"
-          done
-          cp libgrabkernel2.dylib lara/lib/ 2>/dev/null || true
-          cp libxpf.dylib lara/lib/ 2>/dev/null || true
-          echo "lara/ contents:"; ls -la lara/
+          unzip -q lara-main_7.zip -d extracted 2>/dev/null || true
+          INNER=$(find extracted -name "lara.xcodeproj" -maxdepth 3 | head -1 | xargs dirname)
+          echo "Found project at: $INNER"
+          cp -Rn "$INNER/lara/" lara/lara/ 2>/dev/null || true
+          cp libgrabkernel2.dylib lara/lara/lib/ 2>/dev/null || true
+          cp libxpf.dylib lara/lara/lib/ 2>/dev/null || true
+          echo "lara/lara contents:"
+          ls lara/lara/
 
-      - name: Build
+      - name: Patch pbxproj
+        run: |
+          sed -i '' 's/GENERATE_INFOPLIST_FILE = YES/GENERATE_INFOPLIST_FILE = NO/g' lara.xcodeproj/project.pbxproj
+          echo "Patched"
+
+      - name: Build IPA
         run: |
           set -o pipefail
+          rm -rf build
           mkdir -p build
-
           xcodebuild \
             -project lara.xcodeproj \
             -scheme lara \
             -configuration Release \
-            -derivedDataPath "$PWD/build/DerivedDataApp" \
             -destination 'generic/platform=iOS' \
             ARCHS=arm64e \
             ONLY_ACTIVE_ARCH=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="Config/lara.entitlements" \
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             ENABLE_BITCODE=NO \
-            clean build \
+            archive \
+            -archivePath "$PWD/build/lara.xcarchive" \
             2>&1 | tee build/xcodebuild.log
-
-          APP_PATH="$PWD/build/DerivedDataApp/Build/Products/Release-iphoneos/lara.app"
+          APP_PATH="$PWD/build/lara.xcarchive/Products/Applications/lara.app"
           if [ ! -d "$APP_PATH" ]; then
-            echo "::error::Build did not produce lara.app — see log below."
+            echo "::error::Archive failed"
             tail -n 80 build/xcodebuild.log
             exit 1
           fi
-
-          # Strip Xcode's ad-hoc signature (mirrors ipabuild.sh)
-          codesign --remove "$APP_PATH" || true
-          rm -rf "$APP_PATH/_CodeSignature"
-          rm -f  "$APP_PATH/embedded.mobileprovision"
-
-          # Re-sign the binary with jailbreak entitlements via ldid
-          if [ -f Config/lara.entitlements ]; then
-            ldid -SConfig/lara.entitlements "$APP_PATH/lara"
-          else
-            ldid -S "$APP_PATH/lara"
-          fi
-
-          # Enable file sharing (needed for kernelcache sideloading)
-          plutil -replace UIFileSharingEnabled -bool YES "$APP_PATH/Info.plist"
-
-          # Package as IPA
-          mkdir -p build/Payload
-          cp -R "$APP_PATH" build/Payload/
-          ( cd build && zip -qry lara.ipa Payload )
-          echo "Done! IPA at build/lara.ipa"
+          mkdir -p "$PWD/build/Payload"
+          cp -R "$APP_PATH" "$PWD/build/Payload/"
+          plutil -replace UIFileSharingEnabled -bool YES "$PWD/build/Payload/lara.app/Info.plist"
+          ldid -SConfig/lara.entitlements "$PWD/build/Payload/lara.app/lara"
+          ( cd "$PWD/build" && zip -qry lara.ipa Payload )
+          echo "Done!"
 
       - name: Upload build log
         if: always()
