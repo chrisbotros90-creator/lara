@@ -80,7 +80,7 @@ jobs:
           plutil -replace UIFileSharingEnabled -bool YES "$PWD/build/Payload/lara.app/Info.plist"
           ldid -SConfig/lara.entitlements "$PWD/build/Payload/lara.app/lara"
           ( cd "$PWD/build" && zip -qry lara.ipa Payload )
-          echo "Done!"
+          echo "IPA built successfully!"
 
       - name: Upload build log
         if: always()
