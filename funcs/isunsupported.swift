@@ -30,7 +30,7 @@ func hasmie() -> Bool {
 }
 
 func isunsupported() -> Bool {
-    let v = ProcessInfo.processInfo.operatingSystemVersion
+    let v = ProcessInfo().operatingSystemVersion
     
     if v.majorVersion < 16 {
         return true
