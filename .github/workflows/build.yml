@@ -1,4 +1,3 @@
-
 name: Build lara IPA
 
 on:
@@ -22,23 +21,13 @@ jobs:
       - name: Install ldid
         run: brew install ldid
 
-      - name: Fix structure
-        run: |
-          unzip -q lara-main_7.zip -d extracted
-          mkdir -p lara/lara
-          cp -R extracted/lara-main/lara/ lara/lara/
-          cp libgrabkernel2.dylib lara/lara/lib/ 2>/dev/null || true
-          cp libxpf.dylib lara/lara/lib/ 2>/dev/null || true
-          echo "lara/lara contents:"
-          ls lara/lara/
-
-      - name: Patch pbxproj
-        run: |
-          sed -i '' 's/GENERATE_INFOPLIST_FILE = YES/GENERATE_INFOPLIST_FILE = NO/g' lara.xcodeproj/project.pbxproj
-          echo "Patched"
-
       - name: Build IPA
         run: |
+          unzip -q lara-main_7.zip -d extracted
+          cd extracted/lara-main
+          cp ../../libgrabkernel2.dylib lara/lib/ 2>/dev/null || true
+          cp ../../libxpf.dylib lara/lib/ 2>/dev/null || true
+          sed -i '' 's/GENERATE_INFOPLIST_FILE = YES/GENERATE_INFOPLIST_FILE = NO/g' lara.xcodeproj/project.pbxproj
           set -o pipefail
           rm -rf build
           mkdir -p build
@@ -76,12 +65,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: xcodebuild-log
-          path: build/xcodebuild.log
+          path: extracted/lara-main/build/xcodebuild.log
           retention-days: 7
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: lara-ipa
-          path: build/lara.ipa
+          path: extracted/lara-main/build/lara.ipa
           retention-days: 30
