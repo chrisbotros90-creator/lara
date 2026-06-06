@@ -1,4 +1,3 @@
-
 name: Build lara IPA
 
 on:
@@ -34,39 +33,57 @@ jobs:
           # Fix ProcessInfo.processInfo -> ProcessInfo()
           find . -name "*.swift" -type f -exec sed -i '' 's/ProcessInfo\.processInfo/ProcessInfo()/g' {} \;
           
-          # Add @MainActor to verifyPlist function
-          sed -i '' '/^func verifyPlist/i\
-@MainActor\
-' lara/views/tweaks/mobilegestalt/GestaltView.swift
-          
-          # Fix Shape protocol warnings
-          for file in lara/PartyUI/UI/Buttons/*.swift lara/PartyUI/UI/Inputs/*.swift; do
-            if [ -f "$file" ]; then
-              sed -i '' 's/\bvar shape: Shape\b/var shape: any Shape/g' "$file"
-              sed -i '' 's/shape: Shape =/shape: any Shape =/g' "$file"
-            fi
-          done
-          
-          python3 - << 'EOF'
+          # Apply all other fixes with Python
+          python3 << 'PYSCRIPT'
           import os
+          import re
 
           def prepend(path, line):
               with open(path) as f: c = f.read()
               if line not in c:
                   with open(path, 'w') as f: f.write(line + '\n' + c)
 
+          # Add import statements
           prepend('lara/classes/laramgr.swift', 'import Foundation')
           prepend('lara/funcs/isunsupported.swift', 'import Foundation')
           prepend('lara/views/fm/FileSystemHelpers.swift', 'import Foundation')
           prepend('lara/views/tools/ClipboardManagerView.swift', 'import Combine')
           prepend('lara/views/tools/DeviceInfoView.swift', 'import Foundation')
 
+          # Add @MainActor to verifyPlist
+          gestalt_path = 'lara/views/tweaks/mobilegestalt/GestaltView.swift'
+          if os.path.exists(gestalt_path):
+              with open(gestalt_path) as f: content = f.read()
+              content = re.sub(
+                  r'(\n)(\s*)func verifyPlist\(',
+                  r'\1\2@MainActor\n\2func verifyPlist(',
+                  content
+              )
+              with open(gestalt_path, 'w') as f: f.write(content)
+              print('Added @MainActor to verifyPlist')
+
+          # Fix Shape protocol warnings
+          shape_files = [
+              'lara/PartyUI/UI/Buttons/FancyButtonStyle.swift',
+              'lara/PartyUI/UI/Buttons/PrimaryButtonStyle.swift',
+              'lara/PartyUI/UI/Buttons/TranslucentButtonStyle.swift',
+              'lara/PartyUI/UI/Inputs/TextFieldBackground.swift'
+          ]
+          for file_path in shape_files:
+              if os.path.exists(file_path):
+                  with open(file_path) as f: content = f.read()
+                  content = re.sub(r':\s*Shape\b', ': any Shape', content)
+                  content = content.replace('var shape: Shape', 'var shape: any Shape')
+                  with open(file_path, 'w') as f: f.write(content)
+                  print(f'Fixed Shape in {file_path}')
+
+          # Update project settings
           pbx = 'lara.xcodeproj/project.pbxproj'
           with open(pbx) as f: c = f.read()
           c = c.replace('GENERATE_INFOPLIST_FILE = YES', 'GENERATE_INFOPLIST_FILE = NO')
           with open(pbx, 'w') as f: f.write(c)
           print('All patches applied')
-          EOF
+          PYSCRIPT
 
       - name: Build IPA
         run: |
