@@ -27,7 +27,7 @@ private func loadMutablePropertyListDictionary(from url: URL) throws -> NSMutabl
 }
 
 private func clearImmutableForOverwriteIfNeeded(path: String) -> String? {
-    let majorVersion = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+    let majorVersion = ProcessInfo().operatingSystemVersion.majorVersion
     guard majorVersion == 16 else { return nil }
 
     let fm = FileManager.default
@@ -564,7 +564,7 @@ final class laramgr: ObservableObject {
                 }
                 return true
             } else {
-                logmsg("Please install Pocket Poster before using Pocket Poster Helper. If you do have Pocket Poster installed, make sure you did not modify the bundle ID. If you installed Pocket Poster inside of LiveContainer, make sure you also did not modify the bundle ID of LiveContainer.")
+                logmsg("Please install Pocket Poster before using Pocket Poster Helper. If you do have Pocket Poster installed, make sure you did not modify the bundle ID. If you installed Pocket[...]
                 return false
             }
         } catch {
