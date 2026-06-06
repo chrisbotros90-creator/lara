@@ -1,3 +1,4 @@
+
 name: Build lara IPA
 
 on:
@@ -29,6 +30,23 @@ jobs:
           cd extracted/lara-main
           cp ../../libgrabkernel2.dylib lara/lib/ 2>/dev/null || true
           cp ../../libxpf.dylib lara/lib/ 2>/dev/null || true
+          
+          # Fix ProcessInfo.processInfo -> ProcessInfo()
+          find . -name "*.swift" -type f -exec sed -i '' 's/ProcessInfo\.processInfo/ProcessInfo()/g' {} \;
+          
+          # Add @MainActor to verifyPlist function
+          sed -i '' '/^func verifyPlist/i\
+@MainActor\
+' lara/views/tweaks/mobilegestalt/GestaltView.swift
+          
+          # Fix Shape protocol warnings
+          for file in lara/PartyUI/UI/Buttons/*.swift lara/PartyUI/UI/Inputs/*.swift; do
+            if [ -f "$file" ]; then
+              sed -i '' 's/\bvar shape: Shape\b/var shape: any Shape/g' "$file"
+              sed -i '' 's/shape: Shape =/shape: any Shape =/g' "$file"
+            fi
+          done
+          
           python3 - << 'EOF'
           import os
 
@@ -47,7 +65,7 @@ jobs:
           with open(pbx) as f: c = f.read()
           c = c.replace('GENERATE_INFOPLIST_FILE = YES', 'GENERATE_INFOPLIST_FILE = NO')
           with open(pbx, 'w') as f: f.write(c)
-          print('Patches applied')
+          print('All patches applied')
           EOF
 
       - name: Build IPA
