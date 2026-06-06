@@ -21,17 +21,78 @@ jobs:
       - name: Install ldid
         run: brew install ldid
 
-      - name: Build IPA
+      - name: Extract and patch
         run: |
           unzip -q lara-main_7.zip -d extracted
           cd extracted/lara-main
           cp ../../libgrabkernel2.dylib lara/lib/ 2>/dev/null || true
           cp ../../libxpf.dylib lara/lib/ 2>/dev/null || true
+          python3 - << 'EOF'
+          import os
 
-          # Fix missing import Foundation
-          for f in lara/classes/laramgr.swift lara/funcs/isunsupported.swift lara/views/fm/FileSystemHelpers.swift; do
-            grep -q "^import Foundation" "$f" || sed -i '' '1s/^/import Foundation\n/' "$f"
-          done
+          def prepend(path, line):
+              with open(path) as f: c = f.read()
+              if line not in c:
+                  with open(path, 'w') as f: f.write(line + '\n' + c)
 
-          # Fix missing import Combine in ClipboardManagerView
-          sed -i '' 's/^import SwiftUI$/import SwiftU
+          prepend('lara/classes/laramgr.swift', 'import Foundation')
+          prepend('lara/funcs/isunsupported.swift', 'import Foundation')
+          prepend('lara/views/fm/FileSystemHelpers.swift', 'import Foundation')
+          prepend('lara/views/tools/ClipboardManagerView.swift', 'import Combine')
+          prepend('lara/views/tools/DeviceInfoView.swift', 'import Foundation')
+
+          pbx = 'lara.xcodeproj/project.pbxproj'
+          with open(pbx) as f: c = f.read()
+          c = c.replace('GENERATE_INFOPLIST_FILE = YES', 'GENERATE_INFOPLIST_FILE = NO')
+          with open(pbx, 'w') as f: f.write(c)
+          print('Patches applied')
+          EOF
+
+      - name: Build IPA
+        run: |
+          cd extracted/lara-main
+          set -o pipefail
+          rm -rf build && mkdir -p build
+          xcodebuild \
+            -project lara.xcodeproj \
+            -scheme lara \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            ARCHS=arm64e \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="Config/lara.entitlements" \
+            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            ENABLE_BITCODE=NO \
+            archive \
+            -archivePath "$PWD/build/lara.xcarchive" \
+            2>&1 | tee build/xcodebuild.log
+          APP_PATH="$PWD/build/lara.xcarchive/Products/Applications/lara.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Archive failed"
+            tail -n 80 build/xcodebuild.log
+            exit 1
+          fi
+          mkdir -p "$PWD/build/Payload"
+          cp -R "$APP_PATH" "$PWD/build/Payload/"
+          plutil -replace UIFileSharingEnabled -bool YES "$PWD/build/Payload/lara.app/Info.plist"
+          ldid -SConfig/lara.entitlements "$PWD/build/Payload/lara.app/lara"
+          ( cd "$PWD/build" && zip -qry lara.ipa Payload )
+          echo "Done!"
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: extracted/lara-main/build/xcodebuild.log
+          retention-days: 7
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: lara-ipa
+          path: extracted/lara-main/build/lara.ipa
+          retention-days: 30
